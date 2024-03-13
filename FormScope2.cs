@@ -38,7 +38,7 @@ namespace evm_VISU
         private ControlsTable controlTable_chnls;
         private ControlsTable controlTable_setups;
 
-        private ServerModbusTCP server;
+        private ServerModbusTCP? server;
         private delegate void MyDelegate();
 
         private ConnectionSetups connection_setups = new ConnectionSetups();
@@ -126,11 +126,13 @@ namespace evm_VISU
 
             _ = Task.Run(async () =>
             {
+                if (server == null) return;
                 try
                 {
-                    ServerModbusTCP tmp = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
-                    await tmp.SendRawDataAsync(new byte[] { 0, 0, 0, 0, 0, 4, (byte)connection_setups.SlaveAdr, 25, 0, 3 });
-                    tmp.close();
+                  //  server?.close();
+                  //  server = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
+                    await server.SendRawDataAsync(new byte[] { 0, 0, 0, 0, 0, 4, (byte)connection_setups.SlaveAdr, 25, 0, 3 });
+                   // server.close();
                 }
                 catch (ServerModbusTCPException ex) { };
             });
@@ -368,10 +370,10 @@ namespace evm_VISU
                 }
                 catch (System.AggregateException ex)
                 {
-                    Debug.WriteLine(ex.ToString()); 
+                  //  Debug.WriteLine(ex.ToString()); 
                     log_data("Server exception, connection closed");
-                    server.close();
-                    server = null;
+                    //server.close();
+                    //server = null;
                     BeginInvoke(new MyDelegate(() => {
                         labe_info.Visible = true;
                         labe_info.Text = "Connection lost";
@@ -522,10 +524,10 @@ namespace evm_VISU
             try
             {
                 connection_setups = ConnectionSetups.read();
-                if(server != null) server.close();
+                server?.close();
                 server = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
                 server.Timeout = 300;
-                //server = new ServerModbusTCP("localhost", 8888);
+
             }
             catch (ServerModbusTCPException ex)
             {
@@ -573,7 +575,9 @@ namespace evm_VISU
             int delay_pos = frame_size + 8;
             int chn_pos = frame_size + 9;
             int fifolen_pos = frame_size + 10;
-            if(server is null) { return false; };
+            if(server is null) { 
+                return false; 
+            };
             try
             {
                 byte[] req = new byte[] { 0, 0, 0, 0, 0, 2,(byte) connection_setups.SlaveAdr, 20 };
@@ -888,12 +892,12 @@ namespace evm_VISU
         async private void get_channelsInuse() {
 
             //0x18 function - Get scope channels
-
+            if(server == null) { return; }
             try
             {
-                ServerModbusTCP tmp = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
+               // server = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
 
-                var RXbuf = await tmp.SendRawDataAsync(new byte[] { 0, 0, 0, 0, 0, 2, (byte)connection_setups.SlaveAdr, 0x18 }); // get device holding count
+                var RXbuf = await server.SendRawDataAsync(new byte[] { 0, 0, 0, 0, 0, 2, (byte)connection_setups.SlaveAdr, 0x18 }); // get device holding count
 
                 if (RXbuf[7] != 0x18)
                 {
@@ -957,16 +961,14 @@ namespace evm_VISU
                  *       +-----+----+--------------+-------+----+-----+----+------------------+---------+
 */
             refres_channels = true;
-            if (server is null)
-            {
-                ServerStart();
-            }
+            
+            ServerStart();
 
             try
             {
-                ServerModbusTCP tmp = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
+               // server = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
 
-                var RXbuf = await tmp.SendRawDataAsync(new byte[] { 0, 0, 0, 0, 0, 2, (byte)connection_setups.SlaveAdr, 26 }); // get device holding count
+                var RXbuf = await server.SendRawDataAsync(new byte[] { 0, 0, 0, 0, 0, 2, (byte)connection_setups.SlaveAdr, 26 }); // get device holding count
                 if (RXbuf[7] != 26)
                 {
                     Debug.WriteLine(String.Format("Holding count response error FC = {0}", RXbuf[7]));
@@ -983,7 +985,7 @@ namespace evm_VISU
 
                 for (int i = 0; i < hreg_count; i++)
                 {
-                    RXbuf = await tmp.SendRawDataAsync(new byte[] { 0, 0, 0, 0, 0, 4, (byte)connection_setups.SlaveAdr, 27, 0, (byte)i });
+                    RXbuf = await server.SendRawDataAsync(new byte[] { 0, 0, 0, 0, 0, 4, (byte)connection_setups.SlaveAdr, 27, 0, (byte)i });
 
                     if (RXbuf[7] != 27)
                     {
@@ -1037,7 +1039,7 @@ namespace evm_VISU
                 BeginInvoke(new MyDelegate(() =>
                 {
                     controlTable_chnls.RenderTable();
-                    tmp.close();
+                  //  server.close();
                     refres_channels = false;
                 }));
 
@@ -1143,8 +1145,8 @@ namespace evm_VISU
 
                 try
                 {
-                    if (server is null) return;
-                    ServerModbusTCP tmp = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
+                    //if (server is null) return;
+                    var tmp = new ServerModbusTCP(connection_setups.ServerName, connection_setups.ServerPort);
                     var RXbuf = await tmp.SendRawDataAsync(req.ToArray());
 
 
@@ -1152,7 +1154,7 @@ namespace evm_VISU
                     if (freq < 0) freq = 0;
                     //  if (ind.Count <= 1) freq = 0;
                     req = new List<byte> { 0, 0, 0, 0, 0, 4, (byte)connection_setups.SlaveAdr, 25, (byte)(ch_num), (byte)freq };
-                    RXbuf = await server.SendRawDataAsync(req.ToArray());
+                    RXbuf = await tmp.SendRawDataAsync(req.ToArray());
                     tmp.close();
                     TimeScaleValueChenged();
                     _timer.Start();
@@ -1160,7 +1162,7 @@ namespace evm_VISU
                     //    
                     //}));
 
-                    tmp.close();
+                   // server.close();
                 }
                 catch (ServerModbusTCPException ex)
                 {

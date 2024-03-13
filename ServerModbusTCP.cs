@@ -56,7 +56,7 @@ namespace AsyncSocketTest
         string server;
         int port;
 
-        public int Timeout { set; get; } = 300; // ms
+        public int Timeout { set; get; } = 500; // ms
         public bool Connected { get; set; } = false;
 
         public ServerModbusTCP(string server, int port)
@@ -152,21 +152,22 @@ namespace AsyncSocketTest
                 // timeout logic
               //  Debug.WriteLine("Write Timeout");
                 stream.Close();
-                close();
-                connect();
+               // close();
+              //  connect();
                 throw new ServerModbusTCPException("Write Timeout");
 
             }
+
             var buf_size = 2056;
             var buf_rx = new byte[buf_size];
             var task_read = stream.ReadAsync(buf_rx, 0, buf_size);
-            if (await Task.WhenAny(task_read, Task.Delay(Timeout)) != task_read)
+            if (await Task.WhenAny(task_read, Task.Delay(3000)) != task_read)
             {
                 // timeout logic
-             //   Debug.WriteLine("Read Timeout");
-                stream.Close();
-                close();
-                connect();
+                  Debug.WriteLine("Read Timeout");
+                  stream.Close();
+             //   close();
+                //connect();
                 throw new ServerModbusTCPException("Read Timeout");
             }
 
